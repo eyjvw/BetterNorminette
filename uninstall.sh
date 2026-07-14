@@ -23,14 +23,21 @@ for cmd in better-norminette bnorm; do
 	fi
 done
 
+# remove only OUR marker + the line right after it (PATH export or alias);
+# other tools may have appended an identical export line with their own marker
 marker='# added by better-norminette installer'
 export_line="export PATH=\"$BIN_DIR:\$PATH\""
+alias_line='alias norminette="better-norminette"'
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
 	[ -f "$rc" ] || continue
 	if grep -qxF "$marker" "$rc"; then
-		grep -vxF "$marker" "$rc" | grep -vxF "$export_line" > "$rc.bn_tmp"
+		awk -v m="$marker" -v e="$export_line" -v a="$alias_line" '
+			hold == 1 { hold = 0; if ($0 == e || $0 == a) next; print m }
+			$0 == m { hold = 1; next }
+			{ print }
+		' "$rc" > "$rc.bn_tmp"
 		mv "$rc.bn_tmp" "$rc"
-		info "Cleaned PATH lines from $rc"
+		info "Cleaned PATH/alias lines from $rc"
 		removed=1
 	fi
 done

@@ -98,6 +98,55 @@ if ! command -v norminette >/dev/null 2>&1; then
 	printf 'install it with: pipx install norminette\n'
 fi
 
+# --- interactive setup (works through `curl | sh` thanks to /dev/tty) -------
+ask()
+{
+	printf '%s' "$1" > /dev/tty
+	read -r REPLY < /dev/tty
+}
+
+# default from the system locale
+case "${LANG:-}" in
+	fr*) sys_lang="fr" ;;
+	es*) sys_lang="es" ;;
+	*) sys_lang="en" ;;
+esac
+
+alias_marker='# added by better-norminette installer'
+# first install only — updates must not re-ask
+if [ ! -f "$INSTALL_DIR/lang" ] && [ -e /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+	# 1) default language
+	ask "$(printf '\033[1;36m?\033[0m Default language / Langue par défaut / Idioma [en/fr/es] (%s): ' "$sys_lang")"
+	lang="$(printf '%s' "$REPLY" | tr 'A-Z' 'a-z')"
+	case "$lang" in
+		en | fr | es) ;;
+		*) lang="$sys_lang" ;;
+	esac
+	mkdir -p "$INSTALL_DIR"
+	printf '%s' "$lang" > "$INSTALL_DIR/lang"
+	info "Default language: $lang"
+
+	# 2) alias norminette -> better-norminette
+	ask "$(printf '\033[1;36m?\033[0m Alias \033[1mnorminette\033[0m to better-norminette in your shell? [y/N] ')"
+	case "$(printf '%s' "$REPLY" | tr 'A-Z' 'a-z')" in
+		y | yes | o | oui | s | si | sí)
+			for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+				[ -f "$rc" ] || continue
+				if ! grep -qxF 'alias norminette="better-norminette"' "$rc"; then
+					printf '\n%s\nalias norminette="better-norminette"\n' "$alias_marker" >> "$rc"
+					info "Alias added to $rc"
+				fi
+			done
+			;;
+		*) info "No alias — use better-norminette / bnorm" ;;
+	esac
+elif [ ! -f "$INSTALL_DIR/lang" ]; then
+	# non-interactive first install: pick the system language, no alias
+	mkdir -p "$INSTALL_DIR"
+	printf '%s' "$sys_lang" > "$INSTALL_DIR/lang"
+	info "Default language: $sys_lang (change it with: bnorm lang <en|fr|es>)"
+fi
+
 # add BIN_DIR to PATH in the shell rc files if missing
 add_path_to_rc()
 {
